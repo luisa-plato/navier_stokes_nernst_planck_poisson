@@ -36,12 +36,17 @@ mesh = RectangleMesh(Point(0,0), Point(1,0.5), 32, 16)
 #B  = VectorElement( "Bubble", triangle, 3)
 #V =  P1 + B 
 #V = FunctionSpace(mesh, MINI)
-V = VectorFunctionSpace(mesh,"P", 2)
+#V = VectorFunctionSpace(mesh,"P", 2)
+# Build function spaces on Mini element
+P1 = FiniteElement("Lagrange", mesh.ufl_cell(), 1)
+B = FiniteElement("Bubble",   mesh.ufl_cell(), mesh.topology().dim() + 1)
+MINI = VectorElement(NodalEnrichedElement(P1, B))
+V = FunctionSpace(mesh, MINI)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
-T = 0.09
-num_steps = 600
+T = 0.01
+num_steps = 100
 dt = T / num_steps
 
 #Define initial values for p, n and u
