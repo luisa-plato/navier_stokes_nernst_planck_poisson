@@ -1,0 +1,7 @@
+#This is the gitignore file.
+
+#The animation folder is ignored.
+fp_solver_nsnpp
+
+#The hidden system file ./DS_Store is ignored.
+.DS_Store
