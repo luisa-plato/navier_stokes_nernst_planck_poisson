@@ -34,19 +34,20 @@ regul = 0.0001
 mesh = RectangleMesh(Point(0,0), Point(1,0.5), 32, 16)
 #P1 = VectorElement("Lagrange", triangle, 1)
 #B  = VectorElement( "Bubble", triangle, 3)
-#X = VectorElement(NodalEnrichedElement(P1,B))
+#V =  P1 + B 
+#V = FunctionSpace(mesh, MINI)
 V = VectorFunctionSpace(mesh,"P", 2)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
-T = 0.3
-num_steps = 300
+T = 0.09
+num_steps = 600
 dt = T / num_steps
 
 #Define initial values for p, n and u
 p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
 n_i = interpolate(Expression('x[0] > 0.8 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
-u_i = interpolate(Constant((0,0)),V)
+u_i = project(Constant((0,0)),V)
 
 #The initial value for phi is determined by the initial values for n and p and calculated below.
 phi_i = Function(Y)
