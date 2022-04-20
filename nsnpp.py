@@ -43,24 +43,33 @@ V = FunctionSpace(mesh, MINI)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
-T = 0.09
-num_steps = 600
+T = 1
+num_steps = 100
 dt = T / num_steps
 
 #Define initial values for p, n and u
-p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
-n_i = interpolate(Expression('x[0] > 0.8 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
-u_i = project(Constant((0,0)),V)
+p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0', degree = 1, tol = tol), Y)
+n_i = interpolate(Expression('0', degree = 1, tol = tol), Y)
+u_i = project(Constant((1,0)),V)
 
 #The initial value for phi is determined by the initial values for n and p and calculated below.
 phi_i = Function(Y)
 
 #Define boundary
-boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],0.5)'
+left = 'near(x[0],0)'
+right = 'near(x[0],1)'
+top_and_bottom = 'near(x[1],0) || near(x[1],0.5)'
+left_and_right = 'near(x[0],0) || near(x[0],1)'
 
 #Define no-slip boundary conditions for the velocity field u
-no_slip = Constant((0,0))
-bc  = DirichletBC(V, no_slip, boundary)
+bc_u_top_and_bottom  = DirichletBC(V, Constant((0,0)), top_and_bottom)
+bc_u_left_and_right = DirichletBC(V,Constant((1,0)), left_and_right)
+bcs_u = [bc_u_left_and_right, bc_u_top_and_bottom]
+
+#Define Dirchilet boundary conditions for the electric potential phi
+bc_phi_left = DirichletBC(Y, Constant(1), left)
+bc_phi_right = DirichletBC(Y, Constant(0), right)
+bcs_phi = [bc_phi_left, bc_phi_right]
 
 #Define trial- and testfunctions
 u = TrialFunction(V)
@@ -124,7 +133,7 @@ n = Function(Y)
 phi = Function(Y)
 
 #calculate initial value for phi
-solve(a_phi == L_phi_0, phi)
+solve(a_phi == L_phi_0, phi, bcs_phi)
 phi_i.assign(phi)
 
 #E = project(grad(phi_i), W)
@@ -148,7 +157,7 @@ for i in tqdm(range(num_steps)):
     phi_.assign(phi_i)
 
     #Save streamline plot of the velocity field
-    plot(u)
+    plot(u_i)
     file_name = './fp_solver_nsnpp/plots/velocity_' + str(t) + '.png'
     plt.savefig(file_name)
     plt.close() 
@@ -157,10 +166,10 @@ for i in tqdm(range(num_steps)):
     t += dt
 
     #Compute the solution for the electric potential with the tentative charges 
-    solve(a_phi == L_phi, phi)
+    solve(a_phi == L_phi, phi, bcs_phi)
 
     #Compute the solution for the velocity field 
-    solve(a_u == L_u, u, bc)
+    solve(a_u == L_u, u, bcs_u)
 
     #Compute solution for the charges
     solve(a_p == L_p, p)
@@ -197,10 +206,10 @@ for i in tqdm(range(num_steps)):
         phi_.assign(phi)
 
         #Compute the solution for the electric potential with the tentative charges 
-        solve(a_phi == L_phi, phi)
+        solve(a_phi == L_phi, phi, bcs_phi)
 
         #Compute the solution for the velocity field 
-        solve(a_u == L_u, u, bc)
+        solve(a_u == L_u, u, bcs_u)
 
         #Compute solution for the charges
         solve(a_p == L_p, p)
