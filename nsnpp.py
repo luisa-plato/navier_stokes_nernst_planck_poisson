@@ -31,7 +31,7 @@ theta = 0.0001
 regul = 0.0001
 
 #Create the mesh
-mesh = RectangleMesh(Point(0,0), Point(1,0.5), 48, 24)
+mesh = RectangleMesh(Point(0,0), Point(1,0.5), 56, 28)
 
 #Define the MINI element for the velocity u
 P1 = FiniteElement("Lagrange", "triangle", 1)
@@ -43,7 +43,7 @@ V = FunctionSpace(mesh, MINI)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
-T = 0.09
+T = 0.045
 num_steps = 600
 dt = T / num_steps
 
@@ -82,21 +82,32 @@ phi_ = Function(Y)
 #Define linearized variational forms
 
 #Define variational for the positive charge p using the tentative potential phi_ and velocity u_
-a_p = p * q_p * dx\
-	+ dt * dot(grad(p),grad(q_p)) * dx\
+a_p_mass = p * q_p * dx
+
+#Lump the mass matrix
+M = assemble(a_p_mass)
+mass_action_form = assemble(action(a_p_mass, Constant(1)))
+#print(mass_action_form_p.get_local())
+M.zero()
+M.set_diagonal(mass_action_form)
+
+a_p_rest = dt * dot(grad(p),grad(q_p)) * dx\
 	+ dt * p * dot(grad(phi_), grad(q_p)) * dx\
     - dt * p * dot(u_, grad(q_p)) * dx
 L_p = p_i * q_p * dx
 
 #Define the variational form for the negative charge n using the tentative potential phi_ and velocity u_
-a_n = n * q_n *dx\
-	+ dt * dot(grad(n),grad(q_n)) * dx\
+a_n_mass = n * q_n * dx
+
+a_n_rest = dt * dot(grad(n),grad(q_n)) * dx\
 	- dt * n * dot(grad(phi_), grad(q_n)) * dx\
     - dt * n * dot(u_, grad(q_n)) * dx
 L_n = n_i * q_n * dx
 
 #Define the variational form for phi using the tentative charge densities
 a_phi = dot(grad(phi),grad(g)) * dx
+A_phi = assemble(a_phi)
+
 L_phi = (p_ - n_) * g * dx
 L_phi_0 = (p_i - n_i) * g * dx
 
@@ -104,11 +115,11 @@ L_phi_0 = (p_i - n_i) * g * dx
 a_u = dot(u, v) * dx\
     + dt * inner(grad(u), grad(v)) * dx\
     + dt * dot(dot(u_i, nabla_grad(u)), v) * dx\
-    + 0.5 * dt * div(u_) * dot(u, v) * dx
-#+ regul * inner(grad(u), grad(v)) * dx\
+    + 0.5 * dt * div(u_i) * dot(u, v) * dx\
+    + regul * inner(grad(u), grad(v)) * dx
 L_u = - dt * (p_ - n_) * dot(grad(phi_), v) * dx\
-    + dot(u_i, v) * dx
-#+ regul * inner(grad(u_i), grad(v)) * dx
+    + dot(u_i, v) * dx\
+    + regul * inner(grad(u_i), grad(v)) * dx
 
 
 #Create VTK file for saving solution
@@ -124,7 +135,8 @@ n = Function(Y)
 phi = Function(Y)
 
 #calculate initial value for phi
-solve(a_phi == L_phi_0, phi)
+b_phi_0 = assemble(L_phi_0)
+solve(A_phi, phi.vector(), b_phi_0)
 phi_i.assign(phi)
 
 #E = project(grad(phi_i), W)
@@ -157,14 +169,20 @@ for i in tqdm(range(num_steps)):
     t += dt
 
     #Compute the solution for the electric potential with the tentative charges 
-    solve(a_phi == L_phi, phi)
+    b_phi = (p_.vector() - n_.vector())*mass_action_form
+    solve(A_phi, phi.vector(), b_phi)
 
     #Compute the solution for the velocity field 
     solve(a_u == L_u, u, bc)
 
     #Compute solution for the charges
-    solve(a_p == L_p, p)
-    solve(a_n == L_n, n)
+    K_p = assemble(a_p_rest)
+    b_p = p_i.vector()*mass_action_form
+    solve(M + K_p, p.vector(), b_p)
+
+    K_n = assemble(a_n_rest)
+    b_n = n_i.vector()*mass_action_form
+    solve(M + K_n, n.vector(), b_n)
 
     #Calculte the difference of the solution to the tentative estimate for n and p
     error_p = norm(p.vector() - p_.vector(), 'linf')
@@ -197,14 +215,19 @@ for i in tqdm(range(num_steps)):
         phi_.assign(phi)
 
         #Compute the solution for the electric potential with the tentative charges 
-        solve(a_phi == L_phi, phi)
+        b_phi = (p_.vector() - n_.vector())*mass_action_form
+        solve(A_phi, phi.vector(), b_phi)
 
         #Compute the solution for the velocity field 
         solve(a_u == L_u, u, bc)
 
         #Compute solution for the charges
-        solve(a_p == L_p, p)
-        solve(a_n == L_n, n)
+        K_p = assemble(a_p_rest)
+        solve(M + K_p, p.vector(), b_p)
+
+        K_n = assemble(a_n_rest)
+        solve(M + K_n, n.vector(), b_n)
+
 
         #Calculte the difference of the solution to the tentative estimate for n and p
         error_p = norm(p.vector() - p_.vector(), 'linf')
