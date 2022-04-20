@@ -31,7 +31,7 @@ theta = 0.0001
 regul = 0.0001
 
 #Create the mesh
-mesh = RectangleMesh(Point(0,0), Point(1,0.5), 16, 8)
+mesh = RectangleMesh(Point(0,0), Point(1,0.5), 32, 16)
 
 #Define the MINI element for the velocity u
 P1 = FiniteElement("Lagrange", "triangle", 1)
@@ -43,8 +43,8 @@ V = FunctionSpace(mesh, MINI)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
-T = 0.01
-num_steps = 10
+T = 0.09
+num_steps = 600
 dt = T / num_steps
 
 #Define initial values for p, n and u
@@ -82,18 +82,18 @@ phi_ = Function(Y)
 #Define linearized variational forms
 
 #Define variational for the positive charge p using the tentative potential phi_ and velocity u_
-a_p = 2 * p * q_p * dx\
+a_p = p * q_p * dx\
 	+ dt * dot(grad(p),grad(q_p)) * dx\
 	+ dt * p * dot(grad(phi_), grad(q_p)) * dx\
     - dt * p * dot(u_, grad(q_p)) * dx
-L_p = (p_i + p_) * q_p * dx
+L_p = p_i * q_p * dx
 
 #Define the variational form for the negative charge n using the tentative potential phi_ and velocity u_
-a_n = 2 * n * q_n *dx\
+a_n = n * q_n *dx\
 	+ dt * dot(grad(n),grad(q_n)) * dx\
 	- dt * n * dot(grad(phi_), grad(q_n)) * dx\
     - dt * n * dot(u_, grad(q_n)) * dx
-L_n = (n_i + n_) * q_n * dx
+L_n = n_i * q_n * dx
 
 #Define the variational form for phi using the tentative charge densities
 a_phi = dot(grad(phi),grad(g)) * dx
@@ -167,8 +167,8 @@ for i in tqdm(range(num_steps)):
     solve(a_n == L_n, n)
 
     #Calculte the difference of the solution to the tentative estimate for n and p
-    error_p = errornorm(p, p_, 'L2', mesh=mesh)
-    error_n = errornorm(n, n_, 'L2', mesh=mesh)
+    error_p = norm(p.vector() - p_.vector(), 'linf')
+    error_n = norm(n.vector() - n_.vector(), 'linf')
 
     #Calculte the difference of the solution to the tentative estimate for phi
     error_phi = errornorm(phi, phi_, 'H10', mesh=mesh)
@@ -207,8 +207,8 @@ for i in tqdm(range(num_steps)):
         solve(a_n == L_n, n)
 
         #Calculte the difference of the solution to the tentative estimate for n and p
-        error_p = errornorm(p, p_, 'L2', mesh=mesh)
-        error_n = errornorm(n, n_, 'L2', mesh=mesh)
+        error_p = norm(p.vector() - p_.vector(), 'linf')
+        error_n = norm(n.vector() - n_.vector(), 'linf')
 
         #Calculte the difference of the solution to the tentative estimate for phi
         error_phi = errornorm(phi, phi_, 'H10', mesh=mesh)
@@ -217,7 +217,7 @@ for i in tqdm(range(num_steps)):
         error_u = errornorm(u, u_, 'L2', mesh=mesh)
 
         #Calculte the error
-        error = error_u + error_phi + (1/dt) * (error_p + error_n)
+        error = error_u + error_phi + error_p + error_n
 
     #the tentative solution is close enough and becomes the new solution and becomes the new previous solution
     u_i.assign(u)
