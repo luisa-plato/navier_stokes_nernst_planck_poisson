@@ -31,7 +31,7 @@ theta = 0.0001
 regul = 0.0001
 
 #Create the mesh
-mesh = RectangleMesh(Point(0,0), Point(1,0.5), 32, 16)
+mesh = RectangleMesh(Point(0,0), Point(1,0.5), 48, 24)
 
 #Define the MINI element for the velocity u
 P1 = FiniteElement("Lagrange", "triangle", 1)
@@ -48,8 +48,8 @@ num_steps = 600
 dt = T / num_steps
 
 #Define initial values for p, n and u
-p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
-n_i = interpolate(Expression('x[0] > 0.8 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
+p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0', degree = 1, tol = tol), Y)
+n_i = interpolate(Expression('x[0] > 0.8 + tol? 1 : 0', degree = 1, tol = tol), Y)
 u_i = project(Constant((0,0)),V)
 
 #The initial value for phi is determined by the initial values for n and p and calculated below.
