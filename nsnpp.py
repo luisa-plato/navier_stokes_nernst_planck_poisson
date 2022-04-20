@@ -56,7 +56,7 @@ u_i = project(Constant((0,0)),V)
 phi_i = Function(Y)
 
 #Define boundary
-boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],1)'
+boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],0.5)'
 
 #Define no-slip boundary conditions for the velocity field u
 no_slip = Constant((0,0))
@@ -102,13 +102,13 @@ L_phi_0 = (p_i - n_i) * g * dx
 
 #Define the variational form for the velocity field u 
 a_u = dot(u, v) * dx\
-    + regul * inner(grad(u), grad(v)) * dx\
     + dt * inner(grad(u), grad(v)) * dx\
     + dt * dot(dot(u_i, nabla_grad(u)), v) * dx\
     + 0.5 * dt * div(u_) * dot(u, v) * dx
+#+ regul * inner(grad(u), grad(v)) * dx\
 L_u = - dt * (p_ - n_) * dot(grad(phi_), v) * dx\
-    + dot(u_i, v) * dx\
-    + regul * inner(grad(u_i), grad(v)) * dx
+    + dot(u_i, v) * dx
+#+ regul * inner(grad(u_i), grad(v)) * dx
 
 
 #Create VTK file for saving solution
