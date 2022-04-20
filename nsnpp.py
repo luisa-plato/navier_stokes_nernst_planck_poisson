@@ -177,7 +177,7 @@ for i in tqdm(range(num_steps)):
     error_u = errornorm(u, u_, 'L2', mesh=mesh)
 
     #Calculte the error
-    error = error_u + error_phi + (1/dt) * (error_p + error_n)
+    error = error_u + error_phi + error_p + error_n
     #print('The error is: ', error)
 
     #begin for loop for the fixed point iteration
