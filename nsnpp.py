@@ -43,13 +43,13 @@ V = FunctionSpace(mesh, MINI)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
-T = 0.09
-num_steps = 600
+T = 1
+num_steps = 100
 dt = T / num_steps
 
 #Define initial values for p, n and u
-p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
-n_i = interpolate(Expression('x[0] > 0.8 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
+p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0', degree = 1, tol = tol), Y)
+n_i = interpolate(Expression('0', degree = 1, tol = tol), Y)
 u_i = project(Constant((0,0)),V)
 
 #The initial value for phi is determined by the initial values for n and p and calculated below.
@@ -57,10 +57,17 @@ phi_i = Function(Y)
 
 #Define boundary
 boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],0.5)'
+left = 'near(x[0],0)'
+right = 'near(x[0],1)'
 
 #Define no-slip boundary conditions for the velocity field u
 no_slip = Constant((0,0))
-bc  = DirichletBC(V, no_slip, boundary)
+bc_u  = DirichletBC(V, no_slip, boundary)
+
+#Define Dirchilet boundary conditions for the electric potential phi
+bc_phi_left = DirichletBC(Y, Constant(0), left)
+bc_phi_right = DirichletBC(Y, Constant(1), right)
+bc_phi = [bc_phi_left, bc_phi_right]
 
 #Define trial- and testfunctions
 u = TrialFunction(V)
@@ -157,10 +164,10 @@ for i in tqdm(range(num_steps)):
     t += dt
 
     #Compute the solution for the electric potential with the tentative charges 
-    solve(a_phi == L_phi, phi)
+    solve(a_phi == L_phi, phi, bc_phi)
 
     #Compute the solution for the velocity field 
-    solve(a_u == L_u, u, bc)
+    solve(a_u == L_u, u, bc_u)
 
     #Compute solution for the charges
     solve(a_p == L_p, p)
@@ -197,10 +204,10 @@ for i in tqdm(range(num_steps)):
         phi_.assign(phi)
 
         #Compute the solution for the electric potential with the tentative charges 
-        solve(a_phi == L_phi, phi)
+        solve(a_phi == L_phi, phi, bc_phi)
 
         #Compute the solution for the velocity field 
-        solve(a_u == L_u, u, bc)
+        solve(a_u == L_u, u, bc_u)
 
         #Compute solution for the charges
         solve(a_p == L_p, p)
