@@ -30,23 +30,21 @@ tol = 1E-14
 theta = 0.0001
 regul = 0.0001
 
-#Define function space ---- Solution space V contains u and p,n and phi lie in Y
-mesh = RectangleMesh(Point(0,0), Point(1,0.5), 32, 16)
-#P1 = VectorElement("Lagrange", triangle, 1)
-#B  = VectorElement( "Bubble", triangle, 3)
-#V =  P1 + B 
-#V = FunctionSpace(mesh, MINI)
-#V = VectorFunctionSpace(mesh,"P", 2)
-# Build function spaces on Mini element
-P1 = FiniteElement("Lagrange", mesh.ufl_cell(), 1)
-B = FiniteElement("Bubble",   mesh.ufl_cell(), mesh.topology().dim() + 1)
+#Create the mesh
+mesh = RectangleMesh(Point(0,0), Point(1,0.5), 16, 8)
+
+#Define the MINI element for the velocity u
+P1 = FiniteElement("Lagrange", "triangle", 1)
+B = FiniteElement("Bubble", "triangle", 3)
 MINI = VectorElement(NodalEnrichedElement(P1, B))
+
+#Define function space ---- Solution space V contains u and p,n and phi lie in Y
 V = FunctionSpace(mesh, MINI)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
 T = 0.01
-num_steps = 100
+num_steps = 10
 dt = T / num_steps
 
 #Define initial values for p, n and u
