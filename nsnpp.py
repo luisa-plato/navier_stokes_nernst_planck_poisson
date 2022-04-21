@@ -40,17 +40,20 @@ MINI = VectorElement(NodalEnrichedElement(P1, B))
 
 #Define function space ---- Solution space V contains u and p,n and phi lie in Y
 V = FunctionSpace(mesh, MINI)
+print('dimension of V:', V.dim())
 Y = FunctionSpace(mesh, "P", 1)
+Q = VectorFunctionSpace(mesh, "Lagrange", 1)
 
 #Set the final time and the time-step size
-T = 0.045
-num_steps = 600
+T = 0.01
+num_steps = 100
 dt = T / num_steps
 
 #Define initial values for p, n and u
 p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0', degree = 1, tol = tol), Y)
 n_i = interpolate(Expression('x[0] > 0.8 + tol? 1 : 0', degree = 1, tol = tol), Y)
 u_i = project(Constant((0,0)),V)
+pi_i = interpolate(Constant(0), Y)
 
 #The initial value for phi is determined by the initial values for n and p and calculated below.
 phi_i = Function(Y)
@@ -67,11 +70,15 @@ u = TrialFunction(V)
 p = TrialFunction(Y)
 n = TrialFunction(Y)
 phi =TrialFunction(Y)
+#The pressure pi
+pi = TrialFunction(Y)
 
 v = TestFunction(V)
 q_p = TestFunction(Y)
 q_n = TestFunction(Y)
 g = TestFunction(Y)
+#Testfunction for the pressure recovery
+q = TestFunction(Y)
 
 #Define tentative functions for fixed point solver
 u_ = Function(V)
@@ -121,18 +128,26 @@ L_u = - dt * (p_ - n_) * dot(grad(phi_), v) * dx\
     + dot(u_i, v) * dx\
     + regul * inner(grad(u_i), grad(v)) * dx
 
+#Define the variational form for the pressure recovery
+a_pi = dot(grad(pi), grad(q)) * dx
+L_pi = (p_i - n_i) * dot(grad(phi_i), grad(q)) * dx\
+    + dot(dot(u_i, nabla_grad(u_i)), grad(q)) * dx 
+
+
 
 #Create VTK file for saving solution
 vtkfile_u = File('./fp_solver_nsnpp/velocity.pvd')
 vtkfile_plus = File('./fp_solver_nsnpp/positive.pvd')
 vtkfile_minus = File('./fp_solver_nsnpp/negative.pvd')
 vtkfile_phi = File('./fp_solver_nsnpp/phi.pvd')
+vtkfile_pi = File('./fp_solver_nsnpp/pressure.pvd')
 
 #Time-stepping
 u = Function(V)
 p = Function(Y)
 n = Function(Y)
 phi = Function(Y)
+pi = Function(Y)
 
 #calculate initial value for phi
 b_phi_0 = assemble(L_phi_0)
@@ -150,6 +165,7 @@ vtkfile_u << (u_i, t)
 vtkfile_plus << (p_i, t)
 vtkfile_minus << (n_i, t)
 vtkfile_phi << (phi_i, t)
+vtkfile_pi << (pi_i, t)
 
 for i in tqdm(range(num_steps)):
 
@@ -241,6 +257,7 @@ for i in tqdm(range(num_steps)):
 
         #Calculte the error
         error = error_u + error_phi + error_p + error_n
+    
 
     #the tentative solution is close enough and becomes the new solution and becomes the new previous solution
     u_i.assign(u)
@@ -248,9 +265,14 @@ for i in tqdm(range(num_steps)):
     n_i.assign(n)
     phi_i.assign(phi)
 
+    #Recover the pressure
+    solve(a_pi == L_pi, pi)
+    pi_i.assign(pi)
+
     # Save to file
     vtkfile_u << (u_i, t)
     vtkfile_plus << (p_i,t)
     vtkfile_minus << (n_i,t)
     vtkfile_phi << (phi_i, t)
+    vtkfile_pi << (pi, t)
 
