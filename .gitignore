@@ -2,6 +2,7 @@
 
 #The animation folder is ignored.
 fp_solver_nsnpp
+fp_solver_nsnpp_xmldata
 
 #The hidden system file ./DS_Store is ignored.
 .DS_Store
