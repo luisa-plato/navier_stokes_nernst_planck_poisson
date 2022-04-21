@@ -56,7 +56,7 @@ u_i = project(Constant((0,0)),V)
 phi_i = Function(Y)
 
 #Define boundary
-boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],0.5)'
+boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1], 0.5)'
 
 #Define no-slip boundary conditions for the velocity field u
 no_slip = Constant((0,0))
@@ -148,10 +148,12 @@ for i in tqdm(range(num_steps)):
     phi_.assign(phi_i)
 
     #Save streamline plot of the velocity field
-    plot(u)
-    file_name = './fp_solver_nsnpp/plots/velocity_' + str(t) + '.png'
-    plt.savefig(file_name)
-    plt.close() 
+    if (i/10).is_integer():
+        plot(u)
+        file_name = './fp_solver_nsnpp/plots/velocity_' + str(t) + '.png'
+        plt.savefig(file_name)
+        plt.close()
+        File('./fp_solver_nsnpp_xmldata/velcotiy_' + str(t) + '.xml') << u
 
     # Update current time
     t += dt
