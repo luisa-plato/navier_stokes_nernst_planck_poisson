@@ -31,7 +31,7 @@ theta = 0.0001
 regul = 0.0001
 
 #Create the mesh
-mesh = RectangleMesh(Point(0,0), Point(1,0.5), 48, 24)
+mesh = RectangleMesh(Point(0,0), Point(1,1), 32, 32)
 
 #Define the MINI element for the velocity u
 P1 = FiniteElement("Lagrange", "triangle", 1)
@@ -43,13 +43,14 @@ V = FunctionSpace(mesh, MINI)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
-T = 0.09
-num_steps = 600
+T = 0.1
+num_steps = 100
 dt = T / num_steps
 
 #Define initial values for p, n and u
-p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0', degree = 1, tol = tol), Y)
-n_i = interpolate(Expression('x[0] > 0.8 + tol? 1 : 0', degree = 1, tol = tol), Y)
+p_i = interpolate(Expression('t*cos(pi*x[0])', degree = 1, tol = tol, t = 0, pi = np.pi), Y)
+n_i = interpolate(Expression('t*sin(pi*x[1])', degree = 1, tol = tol, t = 0, pi = np.pi), Y)
+u_e = Expression(('-t*cos(pi*x[0])*sin(pi*x[1])','t*sin(pi*x[0])*cos(pi*x[1])'), degree = 1, t = 0, pi = np.pi)
 u_i = project(Constant((0,0)),V)
 
 #The initial value for phi is determined by the initial values for n and p and calculated below.
@@ -141,6 +142,9 @@ vtkfile_phi << (phi_i, t)
 
 for i in tqdm(range(num_steps)):
 
+    # Update current time
+    t += dt
+
     #Set tentative solution to solution at previous time step
     u_.assign(u_i)
     p_.assign(p_i)
@@ -151,10 +155,15 @@ for i in tqdm(range(num_steps)):
     plot(u)
     file_name = './fp_solver_nsnpp/plots/velocity_' + str(t) + '.png'
     plt.savefig(file_name)
-    plt.close() 
-
-    # Update current time
-    t += dt
+    plt.close()
+    #and of the exact solution
+    u_e.t = t
+    u_e_projected = project(u_e, V)
+    plot(u_e_projected)
+    file_name = './fp_solver_nsnpp/plots/exact_velocity_' + str(t) + '.png'
+    plt.savefig(file_name)
+    plt.close()
+    print('The error of the calculated velocity field to the exact solution is: ', errornorm(u, u_e_projected, 'L2'))
 
     #Compute the solution for the electric potential with the tentative charges 
     solve(a_phi == L_phi, phi)
