@@ -50,7 +50,7 @@ dt = T / num_steps
 #Define the analytic solutions
 p_e = Expression('t*cos(pi*x[0])', degree = 1, tol = tol, t = 0, pi = np.pi)
 n_e = Expression('t*sin(pi*x[1])', degree = 1, tol = tol, t = 0, pi = np.pi)
-phi_e = Expression('(t/(pow(pi,2)) * (cos(pi * x[0]) - sin(pi * x[1]))', degree = 1, t = 0, pi = np.pi)
+phi_e = Expression('t * pow(pi,-1) * (cos(pi * x[0]) - sin(pi * x[1]))', degree = 1, t = 0.0, pi = np.pi)
 u_e = Expression(('-t*cos(pi*x[0])*sin(pi*x[1])','t*sin(pi*x[0])*cos(pi*x[1])'), degree = 1, t = 0, pi = np.pi)
 
 #Define initial values for p, n and u
@@ -60,13 +60,13 @@ n_i = interpolate(Constant(0),Y)
 phi_i = interpolate(Constant(0),Y)
 
 #Define boundary
-boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],0.5)'
+boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],1)'
 
 #Define Dirichlet boundary conditions for the velocity field u based on the analytic solution
 bc_u  = DirichletBC(V, u_e, boundary)
-bc_p = DirichletBC(V, p_e, boundary)
-bc_n = DirichletBC(V, n_e, boundary)
-bc_phi = DirichletBC(V, phi_e, boundary)
+bc_p = DirichletBC(Y, p_e, boundary)
+bc_n = DirichletBC(Y, n_e, boundary)
+bc_phi = DirichletBC(Y, phi_e, boundary)
 
 #Define trial- and testfunctions
 u = TrialFunction(V)
