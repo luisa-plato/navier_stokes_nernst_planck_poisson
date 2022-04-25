@@ -30,81 +30,82 @@ tol = 1E-14
 theta = 0.0001
 regul = 0.0001
 
-#Define function space ---- Solution space V contains u and p,n and phi lie in Y
+#Define function space ---- Solution space V contains the velocity u and the pressure pie and p,n and phi lie in Y
 mesh = RectangleMesh(Point(0,0), Point(1,0.5), 32, 16)
-#P1 = VectorElement("Lagrange", triangle, 1)
-#B  = VectorElement( "Bubble", triangle, 3)
-#X = VectorElement(NodalEnrichedElement(P1,B))
-V = VectorFunctionSpace(mesh,"P", 2)
+P1 = VectorElement("Lagrange", triangle, 1)
+B  = VectorElement( "Bubble", triangle, 3)
+Q = FiniteElement("Lagrange", triangle, 1)
+P2 = VectorElement("Lagrange", triangle, 2)
+MINI = VectorElement(NodalEnrichedElement(P1,B))
+element = MixedElement([P2, Q])
+
+V = FunctionSpace(mesh, element)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
-T = 0.3
-num_steps = 300
+T = 0.1
+num_steps = 100
 dt = T / num_steps
 
 #Define initial values for p, n and u
-p_i = interpolate(Expression('x[0] < 0.2 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
-n_i = interpolate(Expression('x[0] > 0.8 + tol? 1 : 0.000001', degree = 1, tol = tol), Y)
-u_i = interpolate(Constant((0,0)),V)
+p_i = interpolate(Constant(0), Y)
+n_i = interpolate(Constant(0), Y)
+u_pie_i = interpolate(Expression(('0','0','-0.25 * (cos(2 * pi * x[0]) + cos(2 * pi * x[1]))'), degree = 1, pi = np.pi) ,V)
+u_i, pie_i = u_pie_i.split()
 
 #The initial value for phi is determined by the initial values for n and p and calculated below.
 phi_i = Function(Y)
 
 #Define boundary
-boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],1)'
+boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],0.5)'
 
 #Define no-slip boundary conditions for the velocity field u
 no_slip = Constant((0,0))
-bc  = DirichletBC(V, no_slip, boundary)
+bc  = DirichletBC(V.sub(0), no_slip, boundary)
 
 #Define trial- and testfunctions
-u = TrialFunction(V)
+u_pie = TrialFunction(V)
+u, pie = split(u_pie)
 p = TrialFunction(Y)
 n = TrialFunction(Y)
 phi =TrialFunction(Y)
 
-v = TestFunction(V)
+v, q = TestFunctions(V)
 q_p = TestFunction(Y)
 q_n = TestFunction(Y)
 g = TestFunction(Y)
 
-#Define tentative functions for fixed point solver
-u_ = Function(V)
-p_ = Function(Y)
-n_ = Function(Y)
-phi_ = Function(Y)
+#Define variational forms for CHorin projection scheme
 
-#Define linearized variational forms
-
-#Define variational for the positive charge p using the tentative potential phi_ and velocity u_
-a_p = 2 * p * q_p * dx\
+#Define variational for the positive charge p using the previous potential phi_i and velocity u_i
+a_p = p * q_p * dx\
 	+ dt * dot(grad(p),grad(q_p)) * dx\
-	+ dt * p * dot(grad(phi_), grad(q_p)) * dx\
-    - dt * p * dot(u_, grad(q_p)) * dx
-L_p = (p_i + p_) * q_p * dx
+	+ dt * p * dot(grad(phi_i), grad(q_p)) * dx\
+    - dt * p * dot(u_i, grad(q_p)) * dx
+L_p = p_i * q_p * dx
 
-#Define the variational form for the negative charge n using the tentative potential phi_ and velocity u_
-a_n = 2 * n * q_n *dx\
+#Define the variational form for the negative charge n using the previous potential phi_i and velocity u_i
+a_n = n * q_n *dx\
 	+ dt * dot(grad(n),grad(q_n)) * dx\
-	- dt * n * dot(grad(phi_), grad(q_n)) * dx\
-    - dt * n * dot(u_, grad(q_n)) * dx
-L_n = (n_i + n_) * q_n * dx
+	- dt * n * dot(grad(phi_i), grad(q_n)) * dx\
+    - dt * n * dot(u_i, grad(q_n)) * dx
+L_n = n_i * q_n * dx
 
-#Define the variational form for phi using the tentative charge densities
+#Define the variational form for phi using the current charge densities
 a_phi = dot(grad(phi),grad(g)) * dx
-L_phi = (p_ - n_) * g * dx
+L_phi = (p_i - n_i) * g * dx
 L_phi_0 = (p_i - n_i) * g * dx
 
 #Define the variational form for the velocity field u 
-a_u = dot(u, v) * dx\
-    + regul * inner(grad(u), grad(v)) * dx\
+a_u_pie = dot(u, v) * dx\
     + dt * inner(grad(u), grad(v)) * dx\
     + dt * dot(dot(u_i, nabla_grad(u)), v) * dx\
-    + 0.5 * dt * div(u_) * dot(u, v) * dx
-L_u = - dt * (p_ - n_) * dot(grad(phi_), v) * dx\
-    + dot(u_i, v) * dx\
-    + regul * inner(grad(u_i), grad(v)) * dx
+    + 0.5 * dt * div(u_i) * dot(u, v) * dx\
+    - dt * pie * div(v) * dx\
+    + div(u) * q * dx\
+    + dt * dot(grad(pie), grad(q)) * dx
+L_u_pie = - dt * (p_i - n_i) * dot(grad(phi_i), v) * dx\
+    + dot(u_i, v) * dx
 
 
 #Create VTK file for saving solution
@@ -114,7 +115,8 @@ vtkfile_minus = File('./fp_solver_nsnpp/negative.pvd')
 vtkfile_phi = File('./fp_solver_nsnpp/phi.pvd')
 
 #Time-stepping
-u = Function(V)
+u_pie = Function(V)
+u, pie = split(u_pie)
 p = Function(Y)
 n = Function(Y)
 phi = Function(Y)
@@ -122,10 +124,6 @@ phi = Function(Y)
 #calculate initial value for phi
 solve(a_phi == L_phi_0, phi)
 phi_i.assign(phi)
-
-#E = project(grad(phi_i), W)
-#plot(E)
-#plt.show()
 
 #Saving the initial data
 t = 0
@@ -137,89 +135,37 @@ vtkfile_phi << (phi_i, t)
 
 for i in tqdm(range(num_steps)):
 
-    #Set tentative solution to solution at previous time step
-    u_.assign(u_i)
-    p_.assign(p_i)
-    n_.assign(n_i)
-    phi_.assign(phi_i)
-
     #Save streamline plot of the velocity field
-    plot(u)
-    file_name = './fp_solver_nsnpp/plots/velocity_' + str(t) + '.png'
-    plt.savefig(file_name)
-    plt.close() 
+    if (i/10).is_integer():
+        plot(u)
+        file_name = './fp_solver_nsnpp/plots/velocity_' + str(t) + '.png'
+        plt.savefig(file_name)
+        plt.close() 
 
     # Update current time
     t += dt
-
-    #Compute the solution for the electric potential with the tentative charges 
-    solve(a_phi == L_phi, phi)
-
-    #Compute the solution for the velocity field 
-    solve(a_u == L_u, u, bc)
 
     #Compute solution for the charges
     solve(a_p == L_p, p)
     solve(a_n == L_n, n)
 
-    #Calculte the difference of the solution to the tentative estimate for n and p
-    error_p = errornorm(p, p_, 'L2', mesh=mesh)
-    error_n = errornorm(n, n_, 'L2', mesh=mesh)
-
-    #Calculte the difference of the solution to the tentative estimate for phi
-    error_phi = errornorm(phi, phi_, 'H10', mesh=mesh)
-
-    #Calculate the difference of the solution to the tentative estimate for u
-    error_u = errornorm(u, u_, 'L2', mesh=mesh)
-
-    #Calculte the error
-    error = error_u + error_phi + (1/dt) * (error_p + error_n)
-    #print('The error is: ', error)
-
-    #begin for loop for the fixed point iteration
-    for j in range(1000):
-        #while the difference of the tentative solution to the solution at the previous time step is too big, we calculate the solution p, n, phi and u again
-        if error < theta:
-            #print('The fixed point solver took', j, 'iterations.')
-            break
-
-        if j == 101:
-            print('This is taking a looong time!')
-
-        #Update tentative solutions
-        u_.assign(u)
-        p_.assign(p)
-        n_.assign(n)
-        phi_.assign(phi)
-
-        #Compute the solution for the electric potential with the tentative charges 
-        solve(a_phi == L_phi, phi)
-
-        #Compute the solution for the velocity field 
-        solve(a_u == L_u, u, bc)
-
-        #Compute solution for the charges
-        solve(a_p == L_p, p)
-        solve(a_n == L_n, n)
-
-        #Calculte the difference of the solution to the tentative estimate for n and p
-        error_p = errornorm(p, p_, 'L2', mesh=mesh)
-        error_n = errornorm(n, n_, 'L2', mesh=mesh)
-
-        #Calculte the difference of the solution to the tentative estimate for phi
-        error_phi = errornorm(phi, phi_, 'H10', mesh=mesh)
-
-        #Calculate the difference of the solution to the tentative estimate for u
-        error_u = errornorm(u, u_, 'L2', mesh=mesh)
-
-        #Calculte the error
-        error = error_u + error_phi + (1/dt) * (error_p + error_n)
-
-    #the tentative solution is close enough and becomes the new solution and becomes the new previous solution
-    u_i.assign(u)
+    #Update the previous solution for the charges
     p_i.assign(p)
     n_i.assign(n)
+
+    #Compute the solution for the electric potential with the tentative charges 
+    solve(a_phi == L_phi, phi)
+
+    #Update the solution for the 
     phi_i.assign(phi)
+
+    #Compute the solution for the velocity field 
+    solve(a_u_pie == L_u_pie, u_pie, bc)
+
+    #Update
+    u_pie_i.assign(u_pie)
+    u_i, pie_i = u_pie_i.split()    
+    
 
     # Save to file
     vtkfile_u << (u_i, t)
