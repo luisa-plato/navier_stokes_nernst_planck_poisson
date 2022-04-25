@@ -47,21 +47,26 @@ T = 0.1
 num_steps = 100
 dt = T / num_steps
 
-#Define initial values for p, n and u
-p_i = interpolate(Expression('t*cos(pi*x[0])', degree = 1, tol = tol, t = 0, pi = np.pi), Y)
-n_i = interpolate(Expression('t*sin(pi*x[1])', degree = 1, tol = tol, t = 0, pi = np.pi), Y)
+#Define the analytic solutions
+p_e = Expression('t*cos(pi*x[0])', degree = 1, tol = tol, t = 0, pi = np.pi)
+n_e = Expression('t*sin(pi*x[1])', degree = 1, tol = tol, t = 0, pi = np.pi)
+phi_e = Expression('(t/(pow(pi,2)) * (cos(pi * x[0]) - sin(pi * x[1]))', degree = 1, t = 0, pi = np.pi)
 u_e = Expression(('-t*cos(pi*x[0])*sin(pi*x[1])','t*sin(pi*x[0])*cos(pi*x[1])'), degree = 1, t = 0, pi = np.pi)
-u_i = project(Constant((0,0)),V)
 
-#The initial value for phi is determined by the initial values for n and p and calculated below.
-phi_i = Function(Y)
+#Define initial values for p, n and u
+u_i = project(Constant((0,0)),V)
+p_i = interpolate(Constant(0),Y)
+n_i = interpolate(Constant(0),Y)
+phi_i = interpolate(Constant(0),Y)
 
 #Define boundary
 boundary  = 'near(x[0], 0) || near(x[0], 1) || near(x[1],0) || near(x[1],0.5)'
 
-#Define no-slip boundary conditions for the velocity field u
-no_slip = Constant((0,0))
-bc  = DirichletBC(V, no_slip, boundary)
+#Define Dirichlet boundary conditions for the velocity field u based on the analytic solution
+bc_u  = DirichletBC(V, u_e, boundary)
+bc_p = DirichletBC(V, p_e, boundary)
+bc_n = DirichletBC(V, n_e, boundary)
+bc_phi = DirichletBC(V, phi_e, boundary)
 
 #Define trial- and testfunctions
 u = TrialFunction(V)
@@ -125,7 +130,7 @@ n = Function(Y)
 phi = Function(Y)
 
 #calculate initial value for phi
-solve(a_phi == L_phi_0, phi)
+solve(a_phi == L_phi_0, phi, bc_phi)
 phi_i.assign(phi)
 
 #E = project(grad(phi_i), W)
@@ -144,6 +149,12 @@ for i in tqdm(range(num_steps)):
 
     # Update current time
     t += dt
+
+    #Update time in exact solutions conditions
+    u_e.t = t
+    p_e.t = t
+    n_e.t = t
+    phi_e.t = t
 
     #Set tentative solution to solution at previous time step
     u_.assign(u_i)
@@ -166,14 +177,14 @@ for i in tqdm(range(num_steps)):
     print('The error of the calculated velocity field to the exact solution is: ', errornorm(u, u_e_projected, 'L2'))
 
     #Compute the solution for the electric potential with the tentative charges 
-    solve(a_phi == L_phi, phi)
+    solve(a_phi == L_phi, phi, bc_phi)
 
     #Compute the solution for the velocity field 
-    solve(a_u == L_u, u, bc)
+    solve(a_u == L_u, u, bc_u)
 
     #Compute solution for the charges
-    solve(a_p == L_p, p)
-    solve(a_n == L_n, n)
+    solve(a_p == L_p, p, bc_p)
+    solve(a_n == L_n, n, bc_n)
 
     #Calculte the difference of the solution to the tentative estimate for n and p
     error_p = norm(p.vector() - p_.vector(), 'linf')
@@ -206,14 +217,14 @@ for i in tqdm(range(num_steps)):
         phi_.assign(phi)
 
         #Compute the solution for the electric potential with the tentative charges 
-        solve(a_phi == L_phi, phi)
+        solve(a_phi == L_phi, phi, bc_phi)
 
         #Compute the solution for the velocity field 
-        solve(a_u == L_u, u, bc)
+        solve(a_u == L_u, u, bc_u)
 
         #Compute solution for the charges
-        solve(a_p == L_p, p)
-        solve(a_n == L_n, n)
+        solve(a_p == L_p, p, bc_p)
+        solve(a_n == L_n, n, bc_n)
 
         #Calculte the difference of the solution to the tentative estimate for n and p
         error_p = norm(p.vector() - p_.vector(), 'linf')
