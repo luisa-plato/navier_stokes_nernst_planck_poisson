@@ -21,17 +21,22 @@ from dolfin import *
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import pandas as pd
 
 set_log_level(50)
 np.set_printoptions(precision=3)
 tol = 1E-14
 
+#Create the mesh
+nx = ny = 64
+meshsize = 1/nx
+mesh = RectangleMesh(Point(0,0), Point(1,1), nx, ny)
+
 #upper bound for error in fixed point solver
-theta = 0.0001
+#theta = meshsize**3
+theta = 0.000001
 regul = 0.0001
 
-#Create the mesh
-mesh = RectangleMesh(Point(0,0), Point(1,1), 32, 32)
 
 #Define the MINI element for the velocity u
 P1 = FiniteElement("Lagrange", "triangle", 1)
@@ -50,7 +55,7 @@ dt = T / num_steps
 #Define the analytic solutions
 p_e = Expression('t*cos(pi*x[0])', degree = 1, tol = tol, t = 0, pi = np.pi)
 n_e = Expression('t*sin(pi*x[1])', degree = 1, tol = tol, t = 0, pi = np.pi)
-phi_e = Expression('t * pow(pi,-1) * (cos(pi * x[0]) - sin(pi * x[1]))', degree = 1, t = 0.0, pi = np.pi)
+phi_e = Expression('t * pow(pi,-2) * (cos(pi * x[0]) - sin(pi * x[1]))', degree = 1, t = 0.0, pi = np.pi)
 u_e = Expression(('-t*cos(pi*x[0])*sin(pi*x[1])','t*sin(pi*x[0])*cos(pi*x[1])'), degree = 1, t = 0, pi = np.pi)
 
 #Define initial values for p, n and u
@@ -111,7 +116,7 @@ a_u = dot(u, v) * dx\
     + dt * inner(grad(u), grad(v)) * dx\
     + dt * dot(dot(u_i, nabla_grad(u)), v) * dx\
     + 0.5 * dt * div(u_) * dot(u, v) * dx
-#+ regul * inner(grad(u), grad(v)) * dx\
+#+ regul * inner(grad(u), grad(v)) * dx
 L_u = - dt * (p_ - n_) * dot(grad(phi_), v) * dx\
     + dot(u_i, v) * dx
 #+ regul * inner(grad(u_i), grad(v)) * dx
@@ -145,6 +150,7 @@ vtkfile_plus << (p_i, t)
 vtkfile_minus << (n_i, t)
 vtkfile_phi << (phi_i, t)
 
+
 for i in tqdm(range(num_steps)):
 
     # Update current time
@@ -163,18 +169,16 @@ for i in tqdm(range(num_steps)):
     phi_.assign(phi_i)
 
     #Save streamline plot of the velocity field
-    plot(u)
+    plot(u_i)
     file_name = './fp_solver_nsnpp/plots/velocity_' + str(t) + '.png'
     plt.savefig(file_name)
     plt.close()
     #and of the exact solution
-    u_e.t = t
     u_e_projected = project(u_e, V)
     plot(u_e_projected)
     file_name = './fp_solver_nsnpp/plots/exact_velocity_' + str(t) + '.png'
     plt.savefig(file_name)
     plt.close()
-    print('The error of the calculated velocity field to the exact solution is: ', errornorm(u, u_e_projected, 'L2'))
 
     #Compute the solution for the electric potential with the tentative charges 
     solve(a_phi == L_phi, phi, bc_phi)
@@ -251,3 +255,23 @@ for i in tqdm(range(num_steps)):
     vtkfile_minus << (n_i,t)
     vtkfile_phi << (phi_i, t)
 
+#Calculate the error norms
+p_e_projected = interpolate(p_e, Y)
+n_e_projected = interpolate(n_e, Y)
+phi_e_projected = interpolate(phi_e, Y)
+u_e_projected = interpolate(u_e, V)
+
+diff_u = errornorm(u_i, u_e_projected, 'L2')
+diff_p = errornorm(p_i, p_e_projected, 'L2')
+diff_n = errornorm(n_i, n_e_projected, 'L2')
+diff_phi = errornorm(phi_i, phi_e_projected, 'L2')
+
+#Write the errors to a csv-file for later use
+data = {'diff_u': [diff_u],
+    'diff_n': [diff_n],
+    'diff_p': [diff_p],
+    'diff_phi': [diff_phi]
+}
+
+df = pd.DataFrame(data, index=['1/64'])
+df.to_csv('errors.txt', mode='a', header = False)
