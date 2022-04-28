@@ -40,8 +40,8 @@ V = VectorFunctionSpace(mesh, "P", 2)
 Y = FunctionSpace(mesh, "P", 1)
 
 #Set the final time and the time-step size
-T = 5.0
-num_steps = 500
+T = 1.0
+num_steps = 100
 dt = T / num_steps
 
 #Define the analytic solutions
@@ -260,6 +260,7 @@ for i in tqdm(range(num_steps)):
 
         #Update tentative solutions
         u_.assign(u_ipc)
+        p_.assign(p_ipc)
         n_plus_.assign(n_plus)
         n_minus_.assign(n_minus)
         phi_.assign(phi)
@@ -303,6 +304,7 @@ for i in tqdm(range(num_steps)):
 
     #the tentative solution is close enough and becomes the new solution and becomes the new previous solution
     u_i.assign(u)
+    p_i.assign(p)
     n_plus_i.assign(n_plus)
     n_minus_i.assign(n_minus)
     phi_i.assign(phi)
